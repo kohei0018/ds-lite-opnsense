@@ -137,6 +137,7 @@ elif [ "${TUNNEL_MODE}" = "mape" ]; then
     MAPE_RULE_IPV4=$(config_get "//OPNsense/dslite/mape_rule_ipv4")
     MAPE_EA_LENGTH=$(config_get "//OPNsense/dslite/mape_ea_length")
     MAPE_PSID_OFFSET=$(config_get "//OPNsense/dslite/mape_psid_offset")
+    MAPE_CE_FORMAT=$(config_get "//OPNsense/dslite/mape_ce_format")
 
     # A profile supplies only the service-wide constants; the rule prefixes and
     # EA length are per-subscriber and must come from the operator.
@@ -144,11 +145,13 @@ elif [ "${TUNNEL_MODE}" = "mape" ]; then
         if mape_profile_lookup "${MAPE_PROFILE}"; then
             [ -n "${MAPE_BR}" ] || MAPE_BR="${MAPE_P_BR}"
             [ -n "${MAPE_PSID_OFFSET}" ] || MAPE_PSID_OFFSET="${MAPE_P_OFFSET}"
+            [ -n "${MAPE_CE_FORMAT}" ] || MAPE_CE_FORMAT="${MAPE_P_CEFMT}"
         else
             logger -t dslite "WARNING: unknown MAP-E profile '${MAPE_PROFILE}'"
         fi
     fi
     MAPE_PSID_OFFSET="${MAPE_PSID_OFFSET:-6}"
+    MAPE_CE_FORMAT="${MAPE_CE_FORMAT:-rfc}"
 
     if [ -z "${MAPE_BR}" ] || [ -z "${MAPE_RULE_IPV6}" ] || [ -z "${MAPE_RULE_IPV4}" ] ||
        [ -z "${MAPE_EA_LENGTH}" ]; then
@@ -182,9 +185,9 @@ elif [ "${TUNNEL_MODE}" = "mape" ]; then
     # rule, so a wrong rule fails here instead of producing a plausible but
     # incorrect port set.
     MAPE_DERIVED=$(mape_derive "${PD_PREFIX}" "${MAPE_RULE_IPV6}" "${MAPE_RULE_IPV4}" \
-        "${MAPE_EA_LENGTH}" "${MAPE_PSID_OFFSET}")
+        "${MAPE_EA_LENGTH}" "${MAPE_PSID_OFFSET}" "${MAPE_CE_FORMAT}")
     if [ -z "${MAPE_DERIVED}" ]; then
-        logger -t dslite "ERROR: MAP-E rule does not match the delegated prefix ${PD_PREFIX} (rule ${MAPE_RULE_IPV6} ea=${MAPE_EA_LENGTH} offset=${MAPE_PSID_OFFSET})"
+        logger -t dslite "ERROR: MAP-E rule does not match the delegated prefix ${PD_PREFIX} (rule ${MAPE_RULE_IPV6} ea=${MAPE_EA_LENGTH} offset=${MAPE_PSID_OFFSET} ce_format=${MAPE_CE_FORMAT})"
         exit 1
     fi
 
@@ -207,7 +210,7 @@ elif [ "${TUNNEL_MODE}" = "mape" ]; then
     fi
     sleep 1
 
-    logger -t dslite "MAP-E mode: ce=${MAPE_CE} br=${MAPE_BR} ipv4=${MAPE_IPV4} psid=${MAPE_PSID}/${MAPE_PSID_LEN} offset=${MAPE_PSID_OFFSET} (${MAPE_PORTS} ports in ${MAPE_RANGES} ranges)"
+    logger -t dslite "MAP-E mode: ce=${MAPE_CE} br=${MAPE_BR} ipv4=${MAPE_IPV4} psid=${MAPE_PSID}/${MAPE_PSID_LEN} offset=${MAPE_PSID_OFFSET} ce_format=${MAPE_CE_FORMAT} (${MAPE_PORTS} ports in ${MAPE_RANGES} ranges)"
 else
     # Standard DS-Lite mode
     if [ -z "${AFTR_ADDRESS}" ]; then

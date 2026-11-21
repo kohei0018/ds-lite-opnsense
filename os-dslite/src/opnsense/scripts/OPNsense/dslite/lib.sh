@@ -68,28 +68,40 @@ AFTR_MAP="
 # the BR silently drops and which presents as a routing fault. So only values
 # that genuinely apply to the whole service live here.
 #
-# Format: profile|br_ipv6|psid_offset
+# Format: profile|br_ipv6|psid_offset|ce_format
+#
+# ce_format selects how the CE IPv6 interface identifier is built:
+#   rfc     -- RFC 7597 s6:          0000 | IPv4(32) | PSID(16)
+#   draft03 -- draft-ietf-softwire-map-03, used by Japanese VNEs:
+#              00 | IPv4(32) | PSID(16) | 00
+# OCN Virtual Connect uses draft03: verified against a Buffalo WSR-5400AX6
+# running OCN VC (IPv4 153.134.46.18, PSID 15 -> IID 0099:862e:1200:0f00) and
+# an NEC IX2215 in "tunnel mode map-e ocn". The BR drops traffic sourced from
+# a CE address in the wrong format, so this is not cosmetic.
 MAPE_PROFILES="
-v6plus|2404:9200:225:100::64|4
+v6plus|2404:9200:225:100::64|4|rfc
+ocn|2001:380:a120::9|6|draft03
 "
 
-# Look up a MAP-E profile. Sets MAPE_P_BR and MAPE_P_OFFSET.
+# Look up a MAP-E profile. Sets MAPE_P_BR, MAPE_P_OFFSET and MAPE_P_CEFMT.
 # Uses a temp file rather than a pipe: a piped while-loop runs in a subshell,
 # so assignments to the caller's variables would be lost (same reason
 # detect_aftr_from_prefix does this).
 mape_profile_lookup() {
-    local want="$1" name br offset tmpfile
+    local want="$1" name br offset cefmt tmpfile
     MAPE_P_BR=""
     MAPE_P_OFFSET=""
+    MAPE_P_CEFMT=""
     [ -n "${want}" ] || return 1
 
     tmpfile="/tmp/dslite_mape_profiles.tmp"
     printf '%s\n' "${MAPE_PROFILES}" > "${tmpfile}"
-    while IFS='|' read -r name br offset; do
+    while IFS='|' read -r name br offset cefmt; do
         [ -n "${name}" ] || continue
         if [ "${name}" = "${want}" ]; then
             MAPE_P_BR="${br}"
             MAPE_P_OFFSET="${offset}"
+            MAPE_P_CEFMT="${cefmt}"
             break
         fi
     done < "${tmpfile}"
@@ -107,17 +119,20 @@ mape_pf_supported() {
 }
 
 # Derive the MAP-E parameters for this CE from its delegated prefix and the BMR.
-# Usage: mape_derive <pd_prefix> <rule_ipv6> <rule_ipv4> <ea_length> <psid_offset>
+# Usage: mape_derive <pd_prefix> <rule_ipv6> <rule_ipv4> <ea_length> <psid_offset> [ce_format]
+# ce_format is "rfc" (default) or "draft03"; see MAPE_PROFILES.
 # Prints: "<ipv4> <psid> <psid_len> <ce_ipv6> <port_ranges> <ports_total>"
 # Returns non-zero when the prefix does not fall inside the rule, which is the
 # safety property that lets an incomplete profile set fail cleanly instead of
 # producing a plausible but wrong port set.
 mape_derive() {
     command -v python3 >/dev/null 2>&1 || return 1
-    python3 - "$1" "$2" "$3" "$4" "$5" <<'PYEOF' 2>/dev/null
+    python3 - "$1" "$2" "$3" "$4" "$5" "${6:-rfc}" <<'PYEOF' 2>/dev/null
 import sys, ipaddress
 
-pd_s, rule6_s, rule4_s, ea_s, off_s = sys.argv[1:6]
+pd_s, rule6_s, rule4_s, ea_s, off_s, cefmt = sys.argv[1:7]
+if cefmt not in ("rfc", "draft03"):
+    sys.exit(1)
 
 pd = ipaddress.ip_network(pd_s, strict=False)
 rule6 = ipaddress.ip_network(rule6_s, strict=False)
@@ -146,9 +161,13 @@ if k < 0 or a + k > 16:
 ipv4 = ipaddress.IPv4Address(int(rule4.network_address) | (ea >> k))
 psid = ea & ((1 << k) - 1)
 
-# MAP CE address (RFC 7597 s6): interface identifier is
-# 16 zero bits | the IPv4 address | the PSID.
-iid = (int(ipv4) << 16) | psid
+# MAP CE address. The interface identifier is either
+#   rfc:     16 zero bits | IPv4 | PSID(16)            (RFC 7597 s6)
+#   draft03:  8 zero bits | IPv4 | PSID(16) | 8 zero   (draft-ietf-softwire-map-03)
+if cefmt == "draft03":
+    iid = (int(ipv4) << 24) | (psid << 8)
+else:
+    iid = (int(ipv4) << 16) | psid
 ce = ipaddress.IPv6Address((int(pd.network_address) >> 64 << 64) | iid)
 
 # Port set: ports are A(a bits) | PSID(k bits) | j(m bits). j=0 is skipped so

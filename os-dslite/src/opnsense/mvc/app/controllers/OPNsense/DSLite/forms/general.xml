@@ -151,6 +151,13 @@
         <advanced>true</advanced>
     </field>
     <field>
+        <id>dslite.mape_ce_format</id>
+        <label>MAP-E CE Address Format</label>
+        <type>dropdown</type>
+        <help>How the IPv4 address and PSID are embedded in the CE IPv6 address. OCN Virtual Connect uses the draft-03 layout. A wrong format brings the tunnel up but the BR drops every packet. Left blank, the profile decides.</help>
+        <advanced>true</advanced>
+    </field>
+    <field>
         <id>dslite.fixedip_allow_insecure</id>
         <label>Allow Insecure Update URL</label>
         <type>checkbox</type>

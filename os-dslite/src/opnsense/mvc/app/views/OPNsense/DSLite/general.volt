@@ -42,7 +42,7 @@
                     'dslite\\.fixedip_update_url', 'dslite\\.fixedip_auth_user', 'dslite\\.fixedip_auth_pass',
                     'dslite\\.fixedip_allow_insecure'],
         'mape': ['dslite\\.mape_profile', 'dslite\\.mape_br', 'dslite\\.mape_rule_ipv6',
-                 'dslite\\.mape_rule_ipv4', 'dslite\\.mape_ea_length', 'dslite\\.mape_psid_offset']
+                 'dslite\\.mape_rule_ipv4', 'dslite\\.mape_ea_length', 'dslite\\.mape_psid_offset', 'dslite\\.mape_ce_format']
     };
 
     $( document ).ready(function() {

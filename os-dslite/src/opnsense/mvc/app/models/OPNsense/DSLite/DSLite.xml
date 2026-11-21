@@ -131,6 +131,7 @@
             <OptionValues>
                 <custom>Custom (enter all values)</custom>
                 <v6plus>v6plus / JPNE</v6plus>
+                <ocn>OCN Virtual Connect</ocn>
             </OptionValues>
         </mape_profile>
         <mape_br type="TextField">
@@ -158,5 +159,13 @@
             <MinimumValue>0</MinimumValue>
             <MaximumValue>16</MaximumValue>
         </mape_psid_offset>
+        <mape_ce_format type="OptionField">
+            <Required>N</Required>
+            <BlankDesc>From profile (RFC 7597 if custom)</BlankDesc>
+            <OptionValues>
+                <rfc>RFC 7597</rfc>
+                <draft03>draft-ietf-softwire-map-03 (OCN)</draft03>
+            </OptionValues>
+        </mape_ce_format>
     </items>
 </model>

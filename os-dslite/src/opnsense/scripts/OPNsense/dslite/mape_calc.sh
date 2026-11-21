@@ -16,11 +16,15 @@
 #       Use the configured rule and the live delegated prefix.
 #   mape_calc.sh <pd_prefix>
 #       Override the prefix, take the rule from the configuration.
-#   mape_calc.sh <pd_prefix> <rule_ipv6> <rule_ipv4> <ea_length> <psid_offset>
+#   mape_calc.sh <pd_prefix> <rule_ipv6> <rule_ipv4> <ea_length> <psid_offset> [ce_format]
 #       Fully explicit; reads nothing from the configuration.
+#       ce_format is rfc (default) or draft03.
 #
 # Example (published v6plus parameters):
 #   mape_calc.sh 240b:10:1234:5600::/56 240b:10::/31 106.72.0.0/15 25 4
+#
+# Example (OCN Virtual Connect):
+#   mape_calc.sh 2400:4052:1b84:8f00::/56 2400:4052:1000::/36 153.134.0.0/18 20 6 draft03
 
 SCRIPT_DIR=$(dirname "$0")
 . "${SCRIPT_DIR}/lib.sh"
@@ -32,17 +36,20 @@ RULE_IPV6="$2"
 RULE_IPV4="$3"
 EA_LENGTH="$4"
 PSID_OFFSET="$5"
+CE_FORMAT="$6"
 
 if [ -z "${RULE_IPV6}" ]; then
     RULE_IPV6=$(config_get "//OPNsense/dslite/mape_rule_ipv6")
     RULE_IPV4=$(config_get "//OPNsense/dslite/mape_rule_ipv4")
     EA_LENGTH=$(config_get "//OPNsense/dslite/mape_ea_length")
     PSID_OFFSET=$(config_get "//OPNsense/dslite/mape_psid_offset")
+    CE_FORMAT=$(config_get "//OPNsense/dslite/mape_ce_format")
 
     MAPE_PROFILE=$(config_get "//OPNsense/dslite/mape_profile")
     if [ -n "${MAPE_PROFILE}" ] && [ "${MAPE_PROFILE}" != "custom" ]; then
         if mape_profile_lookup "${MAPE_PROFILE}"; then
             [ -n "${PSID_OFFSET}" ] || PSID_OFFSET="${MAPE_P_OFFSET}"
+            [ -n "${CE_FORMAT}" ] || CE_FORMAT="${MAPE_P_CEFMT}"
             BR_ADDRESS="${MAPE_P_BR}"
         fi
     fi
@@ -50,6 +57,7 @@ if [ -z "${RULE_IPV6}" ]; then
     [ -n "${CONFIGURED_BR}" ] && BR_ADDRESS="${CONFIGURED_BR}"
 fi
 PSID_OFFSET="${PSID_OFFSET:-6}"
+CE_FORMAT="${CE_FORMAT:-rfc}"
 
 if [ -z "${PD_PREFIX}" ]; then
     PD_PREFIX=$(get_pd_prefix)
@@ -67,7 +75,7 @@ if [ -z "${RULE_IPV6}" ] || [ -z "${RULE_IPV4}" ] || [ -z "${EA_LENGTH}" ]; then
     exit 1
 fi
 
-DERIVED=$(mape_derive "${PD_PREFIX}" "${RULE_IPV6}" "${RULE_IPV4}" "${EA_LENGTH}" "${PSID_OFFSET}")
+DERIVED=$(mape_derive "${PD_PREFIX}" "${RULE_IPV6}" "${RULE_IPV4}" "${EA_LENGTH}" "${PSID_OFFSET}" "${CE_FORMAT}")
 if [ -z "${DERIVED}" ]; then
     echo "REFUSED: the delegated prefix does not fall inside this rule, or the"
     echo "         parameters are inconsistent."
@@ -77,6 +85,7 @@ if [ -z "${DERIVED}" ]; then
     echo "  rule IPv4        : ${RULE_IPV4}"
     echo "  EA-bits length   : ${EA_LENGTH}"
     echo "  PSID offset      : ${PSID_OFFSET}"
+    echo "  CE format        : ${CE_FORMAT}"
     echo
     echo "The prefix must sit inside the rule IPv6 prefix and be long enough to"
     echo "carry the EA bits. This is a refusal, not a guess: a rule that does not"
@@ -101,6 +110,7 @@ echo "    rule IPv6        : ${RULE_IPV6}"
 echo "    rule IPv4        : ${RULE_IPV4}"
 echo "    EA-bits length   : ${EA_LENGTH}"
 echo "    PSID offset      : ${PSID_OFFSET}"
+echo "    CE format        : ${CE_FORMAT}"
 [ -n "${BR_ADDRESS}" ] && echo "    BR address       : ${BR_ADDRESS}"
 echo
 echo "  Derived"
