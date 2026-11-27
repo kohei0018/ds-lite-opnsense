@@ -16,6 +16,27 @@ SCRIPT_DIR=$(dirname "$0")
 get_config
 
 MODE=$(get_mode)
+
+# IPv4 Internet probe through the tunnel.
+#
+# MAP-E: FreeBSD pf's map-e-portset does not constrain ICMP echo IDs.
+# pf_get_mape_sport() passes the PSID port block to pf_get_sport(), but
+# pf_get_sport() overrides low/high to 1-65535 for ICMP echo, so the
+# translated ID almost always falls outside the CE's port set and the BR
+# drops the packet. TCP/UDP are translated correctly, so probe with TCP.
+# Other modes keep the original ICMP probe.
+ipv4_internet_probe() {
+    local src="$1" code secs
+    if [ "${MODE}" = "mape" ] && command -v curl >/dev/null 2>&1; then
+        secs=$(( (PING_WAIT_MS + 999) / 1000 ))
+        [ "${secs}" -ge 2 ] || secs=2
+        code=$(curl -4 -s -o /dev/null -m "${secs}" --interface "${src}" \
+            -w '%{http_code}' http://1.1.1.1/ 2>/dev/null)
+        [ -n "${code}" ] && [ "${code}" != "000" ]
+        return
+    fi
+    ping -c 1 -W "${PING_WAIT_MS}" -S "${src}" 1.1.1.1 >/dev/null 2>&1
+}
 FIXEDIP_UPDATE_URL=$(config_get "//OPNsense/dslite/fixedip_update_url")
 FIXEDIP_AUTH_USER=$(config_get "//OPNsense/dslite/fixedip_auth_user")
 
@@ -185,13 +206,17 @@ if tunnel_exists; then
             fi
 
             # IPv4 Internet through the tunnel, independent of the BR probe.
-            if ping -c 1 -W "${PING_WAIT_MS}" -S "${ipv4}" 1.1.1.1 >/dev/null 2>&1; then
+            if ipv4_internet_probe "${ipv4}"; then
                 connectivity="connected"
             else
                 connectivity="no internet"
                 append_probe_failure "internet"
                 if [ "${br_ok}" = "1" ]; then
-                    reason="AFTR reachable but IPv4 Internet ping failed (1.1.1.1)"
+                    if [ "${MODE}" = "mape" ]; then
+                        reason="BR reachable but IPv4 Internet TCP probe failed (1.1.1.1:80)"
+                    else
+                        reason="AFTR reachable but IPv4 Internet ping failed (1.1.1.1)"
+                    fi
                 elif [ -z "${br_v6_target}" ]; then
                     reason="AFTR/BR endpoint not known"
                 elif [ -z "${ce_source}" ]; then
@@ -208,7 +233,12 @@ if tunnel_exists; then
                 append_probe_failure "ipv6_internet"
             fi
 
-            if [ -n "${mtu_val}" ] && [ "${mtu_val}" -ge 1280 ] 2>/dev/null; then
+            if [ "${MODE}" = "mape" ]; then
+                # IPv4 ICMP echo cannot cross a MAP-E BR from FreeBSD pf (see
+                # ipv4_internet_probe), so the ping-based MTU probes would
+                # always fail. Skip them rather than report false failures.
+                :
+            elif [ -n "${mtu_val}" ] && [ "${mtu_val}" -ge 1280 ] 2>/dev/null; then
                 probe=$(( mtu_val - 28 ))
                 if [ "${probe}" -gt 0 ] 2>/dev/null; then
                     ping -D -c 1 -W "${PING_WAIT_MS}" -S "${ipv4}" -s "${probe}" 1.1.1.1 >/dev/null 2>&1 ||

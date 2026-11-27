@@ -24,7 +24,7 @@
 #   mape_calc.sh 240b:10:1234:5600::/56 240b:10::/31 106.72.0.0/15 25 4
 #
 # Example (OCN Virtual Connect):
-#   mape_calc.sh 2400:4052:1b84:8f00::/56 2400:4052:1000::/36 153.134.0.0/18 20 6 draft03
+#   mape_calc.sh 2400:4052:1234:5600::/56 2400:4052:1000::/36 153.134.0.0/18 20 6 draft03
 
 SCRIPT_DIR=$(dirname "$0")
 . "${SCRIPT_DIR}/lib.sh"

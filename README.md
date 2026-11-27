@@ -1,5 +1,7 @@
 # OPNsense DS-Lite / Fixed IP Plugin
 
+> 🇯🇵 このフォーク（`ocn-mape` ブランチ）は OCN バーチャルコネクト（MAP-E）に対応させたものです。日本語の説明は [README.ja.md](README.ja.md) を参照してください。
+
 OPNsense plugin for Japanese ISP IPv4-over-IPv6 tunneling. Supports both **DS-Lite** (shared IPv4 / CG-NAT) and **Fixed IP** (dedicated public IPv4 via IPIP). HB46PP auto-provisioning lives on the [`hb46pp` branch](#branches); this branch configures Fixed IP manually.
 
 ## Features

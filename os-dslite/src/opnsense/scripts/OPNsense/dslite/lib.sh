@@ -74,9 +74,9 @@ AFTR_MAP="
 #   rfc     -- RFC 7597 s6:          0000 | IPv4(32) | PSID(16)
 #   draft03 -- draft-ietf-softwire-map-03, used by Japanese VNEs:
 #              00 | IPv4(32) | PSID(16) | 00
-# OCN Virtual Connect uses draft03: verified against a Buffalo WSR-5400AX6
-# running OCN VC (IPv4 153.134.46.18, PSID 15 -> IID 0099:862e:1200:0f00) and
-# an NEC IX2215 in "tunnel mode map-e ocn". The BR drops traffic sourced from
+# OCN Virtual Connect uses draft03: verified against the CE address shown by a
+# Buffalo WSR-5400AX6 running OCN VC on a live line, and consistent with an
+# NEC IX2215 in "tunnel mode map-e ocn". The BR drops traffic sourced from
 # a CE address in the wrong format, so this is not cosmetic.
 MAPE_PROFILES="
 v6plus|2404:9200:225:100::64|4|rfc
